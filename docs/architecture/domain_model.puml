@@ -1,0 +1,125 @@
+@startuml
+!theme plain
+skinparam linetype ortho
+
+entity "Patient" as Patient {
+  *patient_id : UUID
+  --
+  full_name : string
+  date_of_birth : date
+  gender : enum
+  contact_info : jsonb
+  insurance_profile_id : UUID
+  status : enum
+}
+
+entity "InsuranceProfile" as InsuranceProfile {
+  *insurance_profile_id : UUID
+  --
+  payer_name : string
+  policy_number : string
+  coverage_plan : string
+  effective_from : date
+  effective_to : date
+}
+
+entity "Encounter" as Encounter {
+  *encounter_id : UUID
+  --
+  patient_id : UUID
+  scheduled_slot_id : UUID
+  encounter_type : enum
+  status : enum
+  start_time : datetime
+  end_time : datetime
+}
+
+entity "Order" as ClinicalOrder {
+  *order_id : UUID
+  --
+  encounter_id : UUID
+  order_type : enum
+  status : enum
+  performer_id : UUID
+  scheduled_time : datetime
+}
+
+entity "Result" as Result {
+  *result_id : UUID
+  --
+  order_id : UUID
+  result_type : enum
+  payload : jsonb
+  captured_at : datetime
+}
+
+entity "Appointment" as Appointment {
+  *appointment_id : UUID
+  --
+  patient_id : UUID
+  provider_id : UUID
+  resource_id : UUID
+  scheduled_start : datetime
+  scheduled_end : datetime
+  status : enum
+}
+
+entity "Invoice" as Invoice {
+  *invoice_id : UUID
+  --
+  patient_id : UUID
+  encounter_id : UUID
+  amount_due : decimal
+  currency : string
+  status : enum
+  issued_on : date
+}
+
+entity "Payment" as Payment {
+  *payment_id : UUID
+  --
+  invoice_id : UUID
+  method : enum
+  amount : decimal
+  received_on : date
+}
+
+entity "InventoryItem" as InventoryItem {
+  *item_id : UUID
+  --
+  sku : string
+  description : string
+  quantity_on_hand : int
+  reorder_point : int
+  controlled_substance_flag : boolean
+}
+
+entity "Dispense" as Dispense {
+  *dispense_id : UUID
+  --
+  order_id : UUID
+  item_id : UUID
+  quantity_dispensed : int
+  dispensed_at : datetime
+}
+
+Patient ||--o{ Encounter
+Patient ||--o{ Appointment
+Patient ||--o{ Invoice
+Patient ||--o{ InsuranceProfile
+Encounter ||--o{ ClinicalOrder
+ClinicalOrder ||--o{ Result
+Appointment }o--|| InventoryItem : reserves
+Invoice ||--o{ Payment
+ClinicalOrder ||--o{ Dispense
+InventoryItem ||--o{ Dispense
+
+note """Versioning Strategy
+====================
+* Patient, Encounter, Order, Result: event-sourced with immutable fact streams; projections versioned using semantic tags (vMajor.Minor.Patch).
+* Scheduling entities: optimistic concurrency using row-version columns, with breaking schema changes requiring new API namespace (/v{n}).
+* Billing and Inventory: temporal tables capturing effective dating; snapshots retained per retention schedule.
+* PlantUML diagram version: v1.0.0.
+""" as VersioningNote
+VersioningNote .. Patient
+@enduml
